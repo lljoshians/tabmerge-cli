@@ -1,37 +1,57 @@
+// pipeline.js - orchestrate the full bookmark processing pipeline
 const { parseBookmarkFile } = require('./parser');
 const { mergeBookmarks } = require('./merger');
 const { deduplicateBookmarks } = require('./deduplicator');
+const { validateAll } = require('./validator');
 const { applyFilters } = require('./filter');
 const { applySort } = require('./sorter');
-const { computeStats } = require('./stats');
-const { exportToFile, exportToStdout, resolveOutputPath } = require('./exporter');
+const { tagAll } = require('./tagger');
+const { formatBookmarks } = require('./formatter');
+const { exportToFile, exportToStdout } = require('./exporter');
 
-function runPipeline(inputFiles, options = {}) {
-  const parsed = inputFiles.map(f => parseBookmarkFile(f));
+/**
+ * Run the full pipeline given parsed CLI args.
+ * @param {object} args - from parseArgs()
+ */
+async function runPipeline(args) {
+  // 1. Parse all input files
+  const parsed = args.inputs.map(f => parseBookmarkFile(f));
+
+  // 2. Merge
   let bookmarks = mergeBookmarks(parsed);
 
-  if (!options.noDedupe) {
+  // 3. Validate (warn only)
+  const { valid, invalid } = validateAll(bookmarks);
+  if (invalid.length > 0) {
+    console.warn(`Warning: ${invalid.length} invalid bookmark(s) skipped.`);
+  }
+  bookmarks = valid;
+
+  // 4. Deduplicate
+  if (!args.noDedupe) {
     bookmarks = deduplicateBookmarks(bookmarks);
   }
 
-  if (options.filters) {
-    bookmarks = applyFilters(bookmarks, options.filters);
-  }
+  // 5. Tag
+  bookmarks = tagAll(bookmarks);
 
-  if (options.sort) {
-    bookmarks = applySort(bookmarks, options.sort);
-  }
+  // 6. Filter
+  bookmarks = applyFilters(bookmarks, args);
 
-  const stats = computeStats(bookmarks);
+  // 7. Sort
+  bookmarks = applySort(bookmarks, args.sort);
 
-  if (options.output) {
-    const outPath = resolveOutputPath(options.output, options.format || 'json');
-    exportToFile(bookmarks, outPath, { format: options.format, pretty: options.pretty });
-    return { bookmarks, stats, outputPath: outPath };
+  // 8. Format
+  const output = formatBookmarks(bookmarks, args.format || 'json');
+
+  // 9. Export
+  if (args.output) {
+    exportToFile(output, args.output);
   } else {
-    exportToStdout(bookmarks, { format: options.format, pretty: options.pretty });
-    return { bookmarks, stats, outputPath: null };
+    exportToStdout(output);
   }
+
+  return bookmarks;
 }
 
 module.exports = { runPipeline };
