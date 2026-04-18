@@ -1,81 +1,70 @@
-#!/usr/bin/env node
-
 const fs = require('fs');
 const path = require('path');
 const { parseBookmarkFile } = require('./parser');
-const { mergeBookmarks } = require('./merger');
 const { deduplicateBookmarks } = require('./deduplicator');
+const { mergeBookmarks } = require('./merger');
 const { formatBookmarks } = require('./formatter');
+const { computeStats, formatStats } = require('./stats');
 
 function printUsage() {
   console.log(`
-Usage: tabmerge [options] <file1> <file2> [file3...]
+Usage: tabmerge [options] <file1> [file2 ...]
 
 Options:
-  -o, --output <file>   Output file (default: stdout)
-  -f, --format <fmt>    Output format: json or html (default: json)
-  --no-dedup            Skip deduplication
-  -h, --help            Show this help message
+  --format <json|html>   Output format (default: json)
+  --output <file>        Write output to file instead of stdout
+  --stats                Print statistics about the merged bookmarks
+  --no-dedup             Skip deduplication
+  --help                 Show this help message
 `);
 }
 
 function parseArgs(argv) {
-  const args = argv.slice(2);
-  const opts = { format: 'json', dedup: true, output: null, files: [] };
-
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (arg === '-h' || arg === '--help') {
-      printUsage();
-      process.exit(0);
-    } else if (arg === '-f' || arg === '--format') {
-      opts.format = args[++i];
-    } else if (arg === '-o' || arg === '--output') {
-      opts.output = args[++i];
-    } else if (arg === '--no-dedup') {
-      opts.dedup = false;
-    } else if (!arg.startsWith('-')) {
-      opts.files.push(arg);
-    }
+  const args = { files: [], format: 'json', output: null, stats: false, dedup: true };
+  const raw = argv.slice(2);
+  for (let i = 0; i < raw.length; i++) {
+    if (raw[i] === '--help') { args.help = true; }
+    else if (raw[i] === '--format') { args.format = raw[++i]; }
+    else if (raw[i] === '--output') { args.output = raw[++i]; }
+    else if (raw[i] === '--stats') { args.stats = true; }
+    else if (raw[i] === '--no-dedup') { args.dedup = false; }
+    else { args.files.push(raw[i]); }
   }
-
-  return opts;
+  return args;
 }
 
 function run(argv) {
-  const opts = parseArgs(argv);
+  const args = parseArgs(argv);
 
-  if (opts.files.length < 2) {
-    console.error('Error: at least two input files are required.');
+  if (args.help || args.files.length === 0) {
     printUsage();
-    process.exit(1);
+    return;
   }
 
-  if (!['json', 'html'].includes(opts.format)) {
-    console.error(`Error: unsupported format "${opts.format}". Use json or html.`);
-    process.exit(1);
-  }
-
-  const parsed = opts.files.map(f => {
-    const content = fs.readFileSync(path.resolve(f), 'utf-8');
-    return parseBookmarkFile(content);
+  const collections = args.files.map((f) => {
+    const content = fs.readFileSync(path.resolve(f), 'utf8');
+    return parseBookmarkFile(content, path.extname(f));
   });
 
-  let merged = mergeBookmarks(parsed);
-  if (opts.dedup) merged = deduplicateBookmarks(merged);
+  let merged = mergeBookmarks(collections);
 
-  const output = formatBookmarks(merged, opts.format);
+  if (args.dedup) {
+    merged = deduplicateBookmarks(merged);
+  }
 
-  if (opts.output) {
-    fs.writeFileSync(path.resolve(opts.output), output, 'utf-8');
-    console.error(`Written to ${opts.output}`);
+  if (args.stats) {
+    const stats = computeStats(merged);
+    console.error(formatStats(stats));
+  }
+
+  const output = formatBookmarks(merged, args.format);
+
+  if (args.output) {
+    fs.writeFileSync(path.resolve(args.output), output, 'utf8');
+    console.error(`Written to ${args.output}`);
   } else {
-    process.stdout.write(output);
+    console.log(output);
   }
 }
 
-module.exports = { run, parseArgs };
-
-if (require.main === module) {
-  run(process.argv);
-}
+module.exports = { printUsage, parseArgs, run };
