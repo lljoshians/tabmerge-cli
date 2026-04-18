@@ -40,7 +40,11 @@ function filterByFolder(bookmarks, folder) {
  */
 function filterBySince(bookmarks, since) {
   if (!since) return bookmarks;
-  const sinceMs = new Date(since).getTime();
+  const sinceDate = new Date(since);
+  if (isNaN(sinceDate.getTime())) {
+    throw new Error(`Invalid date value for 'since': ${since}`);
+  }
+  const sinceMs = sinceDate.getTime();
   return bookmarks.filter((b) => b.addDate && b.addDate >= sinceMs);
 }
 
