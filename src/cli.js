@@ -5,6 +5,7 @@ const { deduplicateBookmarks } = require('./deduplicator');
 const { mergeBookmarks } = require('./merger');
 const { formatBookmarks } = require('./formatter');
 const { computeStats, formatStats } = require('./stats');
+const { applyFilters } = require('./filter');
 
 function printUsage() {
   console.log(`
@@ -12,23 +13,30 @@ Usage: tabmerge [options] <file1> [file2 ...]
 
 Options:
   --format <json|html>   Output format (default: json)
-  --output <file>        Write output to file instead of stdout
-  --stats                Print statistics about the merged bookmarks
-  --no-dedup             Skip deduplication
+  --output <file>        Write output to file (default: stdout)
+  --keyword <term>       Filter bookmarks by keyword
+  --folder <name>        Filter bookmarks by folder
+  --since <date>         Filter bookmarks added after date (ISO format)
+  --stats                Print statistics summary
   --help                 Show this help message
 `);
 }
 
 function parseArgs(argv) {
-  const args = { files: [], format: 'json', output: null, stats: false, dedup: true };
-  const raw = argv.slice(2);
-  for (let i = 0; i < raw.length; i++) {
-    if (raw[i] === '--help') { args.help = true; }
-    else if (raw[i] === '--format') { args.format = raw[++i]; }
-    else if (raw[i] === '--output') { args.output = raw[++i]; }
-    else if (raw[i] === '--stats') { args.stats = true; }
-    else if (raw[i] === '--no-dedup') { args.dedup = false; }
-    else { args.files.push(raw[i]); }
+  const args = { files: [], format: 'json', output: null, stats: false, filter: {} };
+  let i = 0;
+  while (i < argv.length) {
+    switch (argv[i]) {
+      case '--format': args.format = argv[++i]; break;
+      case '--output': args.output = argv[++i]; break;
+      case '--keyword': args.filter.keyword = argv[++i]; break;
+      case '--folder': args.filter.folder = argv[++i]; break;
+      case '--since': args.filter.since = argv[++i]; break;
+      case '--stats': args.stats = true; break;
+      case '--help': args.help = true; break;
+      default: if (!argv[i].startsWith('--')) args.files.push(argv[i]);
+    }
+    i++;
   }
   return args;
 }
@@ -41,23 +49,17 @@ function run(argv) {
     return;
   }
 
-  const collections = args.files.map((f) => {
-    const content = fs.readFileSync(path.resolve(f), 'utf8');
-    return parseBookmarkFile(content, path.extname(f));
-  });
-
-  let merged = mergeBookmarks(collections);
-
-  if (args.dedup) {
-    merged = deduplicateBookmarks(merged);
-  }
+  const parsed = args.files.map((f) => parseBookmarkFile(fs.readFileSync(f, 'utf8')));
+  let merged = mergeBookmarks(parsed);
+  let deduped = deduplicateBookmarks(merged);
+  let filtered = applyFilters(deduped, args.filter);
 
   if (args.stats) {
-    const stats = computeStats(merged);
+    const stats = computeStats(filtered);
     console.error(formatStats(stats));
   }
 
-  const output = formatBookmarks(merged, args.format);
+  const output = formatBookmarks(filtered, args.format);
 
   if (args.output) {
     fs.writeFileSync(path.resolve(args.output), output, 'utf8');
