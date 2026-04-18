@@ -12,6 +12,11 @@ function parseBookmarkFile(filePath) {
     throw new Error(`File not found: ${resolved}`);
   }
 
+  const ext = path.extname(resolved).toLowerCase();
+  if (ext !== '.html' && ext !== '.htm') {
+    throw new Error(`Expected an HTML file, got: ${ext || '(no extension)'}`);
+  }
+
   const html = fs.readFileSync(resolved, 'utf-8');
   const dom = new JSDOM(html);
   const doc = dom.window.document;
