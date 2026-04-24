@@ -24,4 +24,21 @@ function previewFolders(bookmarks) {
   return ['Folders:', ...lines].join('\n');
 }
 
-module.exports = { previewBookmarks, previewFolders };
+/**
+ * Returns a summary string with basic stats about the bookmark list.
+ * @param {Array} bookmarks
+ * @returns {string}
+ */
+function previewStats(bookmarks) {
+  const total = bookmarks.length;
+  const withFolder = bookmarks.filter(b => b.folder).length;
+  const withDate = bookmarks.filter(b => b.addDate).length;
+  const uniqueFolders = new Set(bookmarks.map(b => b.folder).filter(Boolean)).size;
+  return [
+    `Total bookmarks : ${total}`,
+    `With folder     : ${withFolder} (${uniqueFolders} unique folders)`,
+    `With date       : ${withDate}`,
+  ].join('\n');
+}
+
+module.exports = { previewBookmarks, previewFolders, previewStats };
