@@ -19,14 +19,27 @@ Bookmarks with no or invalid date are placed under `"unknown"`.
 
 ### `applyGrouping(bookmarks, strategy)`
 Dispatch helper. Accepts `'folder'` (default), `'domain'`, or `'date'`.
+Throws a `TypeError` if an unrecognised strategy string is passed.
+
+### `getGroupKeys(grouped)`
+Returns a sorted array of group keys from a grouped bookmarks object.
+Useful for rendering group headings in a consistent order.
+
+```js
+getGroupKeys({ 'mozilla.org': [...], 'github.com': [...] });
+// => ['github.com', 'mozilla.org']
+```
 
 ## Usage
 
 ```js
-const { applyGrouping } = require('./grouper');
+const { applyGrouping, getGroupKeys } = require('./grouper');
 
 const grouped = applyGrouping(bookmarks, 'domain');
 // { 'github.com': [...], 'mozilla.org': [...], ... }
+
+const keys = getGroupKeys(grouped);
+// ['github.com', 'mozilla.org']
 ```
 
 ## Integration
