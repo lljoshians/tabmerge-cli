@@ -8,6 +8,8 @@
 
 /**
  * Keep the oldest bookmark (by addDate) among duplicates.
+ * Bookmarks without an addDate are treated as infinitely old (Infinity),
+ * so they lose to any bookmark that has a date.
  */
 function keepOldest(bookmarks) {
   return bookmarks.reduce((best, bm) => {
@@ -19,6 +21,8 @@ function keepOldest(bookmarks) {
 
 /**
  * Keep the newest bookmark (by addDate) among duplicates.
+ * Bookmarks without an addDate are treated as epoch (0),
+ * so they lose to any bookmark that has a date.
  */
 function keepNewest(bookmarks) {
   return bookmarks.reduce((best, bm) => {
@@ -64,6 +68,10 @@ const POLICIES = {
  * @returns {Object[]}
  */
 function applyMergePolicy(bookmarks, policyName = 'newest') {
+  if (!Array.isArray(bookmarks)) {
+    throw new TypeError(`Expected bookmarks to be an array, got ${typeof bookmarks}`);
+  }
+
   const policy = POLICIES[policyName];
   if (!policy) {
     throw new Error(`Unknown merge policy: "${policyName}". Valid options: ${Object.keys(POLICIES).join(', ')}`);
